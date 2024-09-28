@@ -42,6 +42,10 @@ export async function main() {
 
 	const response2 = await caller.call('service2.gather', {});
 	console.log('Response', response2);
+
+	await kmicroService1.stop();
+	await kmicroService2.stop();
+	await caller.stop();
 }
 
 void main(); // eslint-disable-line unicorn/prefer-top-level-await
