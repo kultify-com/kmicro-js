@@ -28,6 +28,8 @@ jobs:
 
       - run: pnpm install
       - run: pnpm run ci
+        env:
+          NATS: nats://nats:4222
       - run: pnpm run build
 
       - run: npm publish --access public
