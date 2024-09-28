@@ -18,8 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: pnpm ci
-      - run: pnpm build
+      - run: pnpm run ci
+      - run: pnpm run build
 
   publish-npm:
     needs: build

@@ -1,6 +1,7 @@
 {
   "rules": {
-    "unicorn/filename-case": "off"
+    "unicorn/filename-case": "off",
+    "capitalized-comments": "off"
   },
   "prettier": true
 }
