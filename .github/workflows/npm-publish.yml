@@ -10,6 +10,12 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    container: node:20-bullseye
+    services:
+      # Label used to access the service container
+      nats:
+        # Docker Hub image
+        image: nats
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
