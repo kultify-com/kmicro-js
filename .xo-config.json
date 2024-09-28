@@ -1,0 +1,6 @@
+{
+  "rules": {
+    "unicorn/filename-case": "off"
+  },
+  "prettier": true
+}
