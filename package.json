@@ -54,7 +54,8 @@
     "@opentelemetry/resources": "^1.26.0",
     "@opentelemetry/sdk-node": "^0.53.0",
     "@opentelemetry/sdk-trace-node": "^1.26.0",
-    "@opentelemetry/semantic-conventions": "^1.27.0"
+    "@opentelemetry/semantic-conventions": "^1.27.0",
+    "pino": "^9.4.0"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",

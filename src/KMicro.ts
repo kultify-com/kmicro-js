@@ -24,6 +24,7 @@ import {
 	ATTR_RPC_SERVICE,
 	ATTR_SERVICE_NAME,
 } from '@opentelemetry/semantic-conventions/incubating';
+import pino, {type Logger} from 'pino';
 
 export async function init(
 	nats: string,
@@ -61,6 +62,7 @@ export class Kmicro implements Callable {
 	private group: ServiceGroup | undefined;
 	private nc: NatsConnection | undefined;
 	private otel: NodeSDK | undefined;
+	private readonly pinoLogger: pino.Logger;
 
 	constructor(
 		private readonly meta: {
@@ -68,7 +70,13 @@ export class Kmicro implements Callable {
 			version: string;
 			description: string | undefined;
 		},
-	) {}
+	) {
+		this.pinoLogger = pino.pino();
+	}
+
+	public get logger() {
+		return this.pinoLogger;
+	}
 
 	public async init(natsConnection: string) {
 		this.nc = await connect({
@@ -153,11 +161,17 @@ export class Kmicro implements Callable {
 				},
 				contextWithOtel,
 				async (span) => {
+					const spanLogger = this.logger.child({
+						action: name,
+						spanId: span.spanContext().spanId,
+						traceId: span.spanContext().traceId,
+					});
 					try {
 						const requestContext = new RequestContext(
 							contextWithOtel,
 							span,
 							this.nc!,
+							spanLogger,
 							{
 								callDepth: currentCallDepth,
 								currentService: this.meta.name,
@@ -207,10 +221,12 @@ export class Kmicro implements Callable {
 }
 
 export class RequestContext {
+	// eslint-disable-next-line max-params
 	constructor(
 		readonly context: Context,
 		readonly span: Span,
 		readonly nc: NatsConnection,
+		readonly logger: Logger,
 		readonly meta: {
 			callDepth: number;
 			currentService: string;
