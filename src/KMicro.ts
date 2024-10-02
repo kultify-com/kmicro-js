@@ -74,8 +74,8 @@ export class Kmicro implements Callable {
 		this.pinoLogger = pino.pino();
 	}
 
-	public get logger() {
-		return this.pinoLogger;
+	public getLogger(module?: string) {
+		return this.pinoLogger.child({module});
 	}
 
 	public async init(natsConnection: string) {
@@ -161,7 +161,7 @@ export class Kmicro implements Callable {
 				},
 				contextWithOtel,
 				async (span) => {
-					const spanLogger = this.logger.child({
+					const spanLogger = this.pinoLogger.child({
 						action: name,
 						spanId: span.spanContext().spanId,
 						traceId: span.spanContext().traceId,
@@ -226,12 +226,18 @@ export class RequestContext {
 		readonly context: Context,
 		readonly span: Span,
 		readonly nc: NatsConnection,
-		readonly logger: Logger,
+		private readonly logger: Logger,
 		readonly meta: {
 			callDepth: number;
 			currentService: string;
 		},
 	) {}
+
+	public getLogger(module?: string) {
+		return this.logger.child({
+			module,
+		});
+	}
 
 	public async call(
 		target: string,
