@@ -1,12 +1,14 @@
 {
   "name": "@kultify/kmicro-js",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kultify-com/kmicro-js.git"
   },
-  "main": "src/index.js",
+  "source": "src/index.ts",
+  "main": "dist/main.js",
+  "types": "dist/types.d.ts",
   "scripts": {
     "build": "tsup",
     "test": "vitest src/",
