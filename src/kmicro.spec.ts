@@ -21,35 +21,50 @@ describe('kmicro', () => {
 	});
 
 	it('should communication', async () => {
-		let action1ReceivedData: any = null;
-		let action2ReceivedData: any = null;
+		let action1ReceivedData: Uint8Array = new Uint8Array();
+		let action2ReceivedData: Uint8Array = new Uint8Array();
 		node.addEndpoint('action1', async (context, data) => {
 			action1ReceivedData = data;
-			const action2Result = await context.call(`${serviceName}.action2`, {
-				foo: 'bar',
-			});
+			const payload = {foo: 'bar'};
+			const action2Result = await context.call(
+				`${serviceName}.action2`,
+				Buffer.from(JSON.stringify(payload)),
+			);
 			return action2Result;
 		});
 
 		node.addEndpoint('action2', async (context, data) => {
 			expect(context.span).toBeDefined();
 			action2ReceivedData = data;
-			return {ret: 'var'};
+			return Buffer.from(JSON.stringify({ret: 'var'}));
 		});
 
-		const callResult = await node.call(`${serviceName}.action1`, {
+		const payload = {hello: 'world'};
+		const callResult = await node.call(
+			`${serviceName}.action1`,
+			Buffer.from(JSON.stringify(payload)),
+		);
+		expect(JSON.parse(Buffer.from(callResult).toString())).toEqual({
+			ret: 'var',
+		});
+		expect(JSON.parse(Buffer.from(action1ReceivedData).toString())).toEqual({
 			hello: 'world',
 		});
-		expect(callResult).toEqual({ret: 'var'});
-		expect(action1ReceivedData).toEqual({hello: 'world'});
-		expect(action2ReceivedData).toEqual({foo: 'bar'});
+		expect(JSON.parse(Buffer.from(action2ReceivedData).toString())).toEqual({
+			foo: 'bar',
+		});
 	});
 
 	it('should get correct errors', async () => {
 		node.addEndpoint('action1', async (context, data) => {
-			const action2Result = await context.call(`${serviceName}.action2`, {
-				foo: 'bar',
-			});
+			const action2Result = await context.call(
+				`${serviceName}.action2`,
+				Buffer.from(
+					JSON.stringify({
+						foo: 'bar',
+					}),
+				),
+			);
 			return action2Result;
 		});
 
@@ -57,9 +72,14 @@ describe('kmicro', () => {
 			throw new Error('some error');
 		});
 
-		const promise = node.call(`${serviceName}.action1`, {
-			hello: 'world',
-		});
+		const promise = node.call(
+			`${serviceName}.action1`,
+			Buffer.from(
+				JSON.stringify({
+					hello: 'world',
+				}),
+			),
+		);
 		await expect(promise).rejects.toBeInstanceOf(CallError);
 	});
 });

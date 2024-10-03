@@ -1,11 +1,6 @@
 import assert from 'node:assert';
 import {Svc, type Service, type ServiceGroup} from '@nats-io/services';
-import {
-	connect,
-	headers,
-	JSONCodec,
-	type NatsConnection,
-} from '@nats-io/transport-node';
+import {connect, headers, type NatsConnection} from '@nats-io/transport-node';
 import {
 	context,
 	propagation,
@@ -41,20 +36,18 @@ export async function init(
 	return kmicro;
 }
 
-const codec = JSONCodec(); // eslint-disable-line new-cap
-
 // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
 interface Callable {
 	call(
 		target: string,
-		payload: Record<string, any>,
+		payload: Uint8Array,
 		options?: {
 			/**
 			 * @default 5000 ms
 			 */
 			timeout?: number;
 		},
-	): Promise<Record<string, unknown>>;
+	): Promise<Uint8Array>;
 }
 
 export class Kmicro implements Callable {
@@ -118,8 +111,8 @@ export class Kmicro implements Callable {
 		name: string,
 		handler: (
 			context_: RequestContext,
-			data: Record<string, any>,
-		) => Promise<Record<string, any>>,
+			data: Uint8Array,
+		) => Promise<Uint8Array>,
 	) {
 		assert(this.group);
 
@@ -177,8 +170,8 @@ export class Kmicro implements Callable {
 								currentService: this.meta.name,
 							},
 						);
-						const result = await handler(requestContext, message.json());
-						message.respond(codec.encode(result));
+						const result = await handler(requestContext, message.data);
+						message.respond(result);
 						span.setStatus({code: SpanStatusCode.OK});
 					} catch (error_) {
 						span.recordException(error_ as Error);
@@ -197,14 +190,14 @@ export class Kmicro implements Callable {
 	 */
 	public async call(
 		target: string,
-		payload: Record<string, any>,
+		payload: Uint8Array,
 		options?: {
 			/**
 			 * @default 5000 ms
 			 */
 			timeout?: number;
 		},
-	): Promise<Record<string, unknown>> {
+	): Promise<Uint8Array> {
 		assert(this.nc);
 		return doCall(
 			this.nc,
@@ -241,14 +234,14 @@ export class RequestContext {
 
 	public async call(
 		target: string,
-		payload: Record<string, any>,
+		payload: Uint8Array,
 		options?: {
 			/**
 			 * @default 5000 ms
 			 */
 			timeout?: number;
 		},
-	): Promise<Record<string, unknown>> {
+	): Promise<Uint8Array> {
 		return doCall(
 			this.nc,
 			target,
@@ -267,7 +260,7 @@ export class CallError extends Error {
 	constructor(
 		message: string,
 		private readonly target: string,
-		private readonly payload: Record<string, unknown>,
+		private readonly payload: Uint8Array,
 	) {
 		super(message);
 		this.name = 'CallError';
@@ -278,7 +271,7 @@ export class CallError extends Error {
 async function doCall(
 	nc: NatsConnection,
 	target: string,
-	payload: Record<string, any>,
+	payload: Uint8Array,
 	meta: {
 		callDepth: number;
 		/**
@@ -293,7 +286,7 @@ async function doCall(
 		 */
 		timeout?: number;
 	},
-): Promise<Record<string, unknown>> {
+): Promise<Uint8Array> {
 	if (meta.callDepth >= 20) {
 		throw new Error('max call depth reached: ' + meta.callDepth);
 	}
@@ -325,7 +318,7 @@ async function doCall(
 			});
 
 			try {
-				const result = await nc.request(target, codec.encode(payload), {
+				const result = await nc.request(target, payload, {
 					headers: natsHeadersMap,
 					timeout: options?.timeout ?? 5000,
 				});
@@ -340,7 +333,7 @@ async function doCall(
 					);
 				}
 
-				return result.json<Record<string, unknown>>();
+				return result.data;
 			} finally {
 				span.end();
 			}
