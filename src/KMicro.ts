@@ -160,6 +160,13 @@ export class Kmicro implements Callable {
 						traceId: span.spanContext().traceId,
 					});
 					try {
+						const header: Record<string, string> = {};
+						for (const key of message.headers?.keys() ?? []) {
+							if (message.headers?.has(key)) {
+								header[key] = message.headers?.get(key);
+							}
+						}
+
 						const requestContext = new RequestContext(
 							contextWithOtel,
 							span,
@@ -168,6 +175,7 @@ export class Kmicro implements Callable {
 							{
 								callDepth: currentCallDepth,
 								currentService: this.meta.name,
+								header,
 							},
 						);
 						const result = await handler(requestContext, message.data);
@@ -196,6 +204,7 @@ export class Kmicro implements Callable {
 			 * @default 5000 ms
 			 */
 			timeout?: number;
+			header?: Record<string, string>;
 		},
 	): Promise<Uint8Array> {
 		assert(this.nc);
@@ -207,8 +216,11 @@ export class Kmicro implements Callable {
 				callDepth: 0,
 				context: undefined,
 				currentService: this.meta.name,
+				header: options?.header ?? {},
 			},
-			options,
+			{
+				timeout: options?.timeout,
+			},
 		);
 	}
 }
@@ -223,6 +235,7 @@ export class RequestContext {
 		readonly meta: {
 			callDepth: number;
 			currentService: string;
+			header: Record<string, string>;
 		},
 	) {}
 
@@ -240,6 +253,7 @@ export class RequestContext {
 			 * @default 5000 ms
 			 */
 			timeout?: number;
+			header?: Record<string, string>;
 		},
 	): Promise<Uint8Array> {
 		return doCall(
@@ -250,6 +264,7 @@ export class RequestContext {
 				callDepth: this.meta.callDepth,
 				context: this.context,
 				currentService: this.meta.currentService,
+				header: this.meta.header,
 			},
 			options,
 		);
@@ -279,12 +294,17 @@ async function doCall(
 		 */
 		context: Context | undefined;
 		currentService: string;
+		/**
+		 * Headers from the parent calls
+		 */
+		header: Record<string, string>;
 	},
 	options?: {
 		/**
 		 * @default 5000 ms
 		 */
 		timeout?: number;
+		header?: Record<string, string>;
 	},
 ): Promise<Uint8Array> {
 	if (meta.callDepth >= 20) {
@@ -316,6 +336,14 @@ async function doCall(
 					carrier.set(key, value);
 				},
 			});
+			const mergedHeaders = {...meta.header, ...options?.header};
+			for (const key in mergedHeaders) {
+				if (!Object.hasOwn(mergedHeaders, key)) {
+					continue;
+				}
+
+				natsHeadersMap.set(key, mergedHeaders[key]);
+			}
 
 			try {
 				const result = await nc.request(target, payload, {
