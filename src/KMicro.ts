@@ -21,6 +21,9 @@ import {
 } from '@opentelemetry/semantic-conventions/incubating';
 import pino, {type Logger} from 'pino';
 
+/**
+ * Use init to create a kmicro instance and directly start (init) it
+ */
 export async function init(
 	nats: string,
 	serviceName: string,
@@ -71,10 +74,13 @@ export class Kmicro implements Callable {
 		return this.pinoLogger.child({module});
 	}
 
-	public async init(natsConnection: string) {
+	public async init(natsURI: string) {
+		const natsUrl = new URL(natsURI);
 		this.nc = await connect({
 			name: this.meta.name,
-			servers: natsConnection,
+			user: natsUrl.username,
+			pass: natsUrl.password,
+			servers: [natsUrl.host],
 		});
 		const svc = new Svc(this.nc);
 		this.service = await svc.add({
