@@ -151,7 +151,7 @@ export class Kmicro implements Callable {
 				},
 			);
 
-			const tracer = trace.getTracer(name, this.meta.version);
+			const tracer = trace.getTracer(this.meta.name, this.meta.version);
 			const spanName = `handle: ${this.meta.name}.${name}`;
 			await tracer.startActiveSpan(
 				spanName,
@@ -211,9 +211,38 @@ export class Kmicro implements Callable {
 			 */
 			timeout?: number;
 			header?: Record<string, string>;
+			moleculerTrace?: {
+				traceId?: string | undefined;
+				parentId?: string | undefined;
+			};
 		},
 	): Promise<Uint8Array> {
 		assert(this.nc);
+
+		let trace:
+			| undefined
+			| {
+					traceId: string;
+					parentId: string;
+			  };
+		if (options?.moleculerTrace) {
+			// we have to shorten the moleculer trace id because the jaeger exporter uses only 16 chars
+			const molTraceId = options.moleculerTrace.traceId
+				?.replaceAll('-', '')
+				.slice(0, 16);
+			const traceId = Array.from({length: 16})
+				.fill('0')
+				.join('')
+				.concat(molTraceId ?? '');
+			const molParentId = options.moleculerTrace.parentId
+				?.replaceAll('-', '')
+				.slice(0, 16);
+			trace = {
+				traceId,
+				parentId: molParentId ?? '',
+			};
+		}
+
 		return doCall(
 			this.nc,
 			target,
@@ -226,6 +255,7 @@ export class Kmicro implements Callable {
 			},
 			{
 				timeout: options?.timeout,
+				trace,
 			},
 		);
 	}
@@ -311,15 +341,36 @@ async function doCall(
 		 */
 		timeout?: number;
 		header?: Record<string, string>;
+		/**
+		 * Optionally pass an existing trace from the moleculer framework
+		 */
+		trace?: {
+			/**
+			 * This is the ID of the whole trace forest and is used to uniquely identify a distributed trace through a system.
+			 */
+			traceId: string | undefined;
+			/**
+			 * or span id:  This is the ID of this request as known by the caller
+			 */
+			parentId: string | undefined;
+		};
 	},
 ): Promise<Uint8Array> {
 	if (meta.callDepth >= 20) {
 		throw new Error('max call depth reached: ' + meta.callDepth);
 	}
 
+	const carrierData: Context | {traceparent?: string} = meta.context ?? {};
+	if (options?.trace && !meta.context) {
+		const version = Buffer.alloc(1).toString('hex');
+		const flags = '01'; // means sampled
+		const header = `${version}-${options.trace.traceId}-${options.trace.parentId}-${flags}`;
+		(carrierData as {traceparent?: string | undefined}).traceparent = header;
+	}
+
 	const callingContext: Context = propagation.extract(
 		context.active(),
-		meta.context ?? {},
+		carrierData,
 	);
 	const tracer = trace.getTracer('default');
 	const [service, action] = target.split('.');
