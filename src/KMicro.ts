@@ -407,7 +407,6 @@ async function doCall(
 					headers: natsHeadersMap,
 					timeout: options?.timeout ?? 5000,
 				});
-				span.setStatus({code: SpanStatusCode.OK});
 				if (result.headers?.get('Nats-Service-Error-Code')) {
 					span.setStatus({code: SpanStatusCode.ERROR});
 					span.recordException(result.headers.get('Nats-Service-Error'));
@@ -418,6 +417,7 @@ async function doCall(
 					);
 				}
 
+				span.setStatus({code: SpanStatusCode.OK});
 				return result.data;
 			} finally {
 				span.end();
