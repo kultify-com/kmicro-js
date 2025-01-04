@@ -1,4 +1,3 @@
-import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { type NatsConnection, connect, headers } from "@nats-io/transport-node";
 import {
@@ -19,6 +18,7 @@ import {
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
+import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
@@ -399,8 +399,9 @@ async function doCall(
 				if (!Object.hasOwn(mergedHeaders, key)) {
 					continue;
 				}
-
-				natsHeadersMap.set(key, mergedHeaders[key]);
+				if (mergedHeaders[key]) {
+					natsHeadersMap.set(key, mergedHeaders[key]);
+				}
 			}
 
 			try {
