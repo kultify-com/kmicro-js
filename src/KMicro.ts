@@ -1,25 +1,25 @@
-import assert from 'node:assert';
-import {Svc, type Service, type ServiceGroup} from '@nats-io/services';
-import {connect, headers, type NatsConnection} from '@nats-io/transport-node';
+import assert from "node:assert";
+import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
+import { type NatsConnection, connect, headers } from "@nats-io/transport-node";
 import {
-	context,
-	propagation,
-	SpanKind,
-	SpanStatusCode,
-	trace,
 	type Context,
 	type Span,
-} from '@opentelemetry/api';
-import {OTLPTraceExporter} from '@opentelemetry/exporter-trace-otlp-proto';
-import {Resource} from '@opentelemetry/resources';
-import {NodeSDK} from '@opentelemetry/sdk-node';
+	SpanKind,
+	SpanStatusCode,
+	context,
+	propagation,
+	trace,
+} from "@opentelemetry/api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { Resource } from "@opentelemetry/resources";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
 	ATTR_MESSAGING_SYSTEM,
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
-	ATTR_SERVICE_NAME,
-} from '@opentelemetry/semantic-conventions/incubating';
-import pino, {type Logger} from 'pino';
+} from "@opentelemetry/semantic-conventions/incubating";
+import pino, { type Logger } from "pino";
 
 /**
  * Use init to create a kmicro instance and directly start (init) it
@@ -71,7 +71,7 @@ export class Kmicro implements Callable {
 	}
 
 	public getLogger(module?: string) {
-		return this.pinoLogger.child({module});
+		return this.pinoLogger.child({ module });
 	}
 
 	public async init(natsURI: string) {
@@ -82,7 +82,7 @@ export class Kmicro implements Callable {
 			pass: natsUrl.password,
 			servers: [natsUrl.host],
 		});
-		const svc = new Svc(this.nc);
+		const svc = new Svcm(this.nc);
 		this.service = await svc.add({
 			name: this.meta.name,
 			version: this.meta.version,
@@ -94,7 +94,7 @@ export class Kmicro implements Callable {
 			traceExporter: new OTLPTraceExporter(),
 			resource: new Resource({
 				[ATTR_SERVICE_NAME]: this.meta.name,
-				[ATTR_MESSAGING_SYSTEM]: 'nats',
+				[ATTR_MESSAGING_SYSTEM]: "nats",
 			}),
 		});
 
@@ -131,11 +131,11 @@ export class Kmicro implements Callable {
 
 			// Prevent infinite loops
 			const currentCallDepth = Number.parseInt(
-				message.headers?.get('kmc-depth') ?? '0',
+				message.headers?.get("kmc-depth") ?? "0",
 				10,
 			);
 			if (currentCallDepth >= 20) {
-				throw new Error('max call depth reached: ' + currentCallDepth);
+				throw new Error(`max call depth reached: ${currentCallDepth}`);
 			}
 
 			const contextWithOtel: Context = propagation.extract(
@@ -176,6 +176,7 @@ export class Kmicro implements Callable {
 						const requestContext = new RequestContext(
 							contextWithOtel,
 							span,
+							// biome-ignore lint/style/noNonNullAssertion: Checked with assert
 							this.nc!,
 							spanLogger,
 							{
@@ -186,11 +187,11 @@ export class Kmicro implements Callable {
 						);
 						const result = await handler(requestContext, message.data);
 						message.respond(result);
-						span.setStatus({code: SpanStatusCode.OK});
+						span.setStatus({ code: SpanStatusCode.OK });
 					} catch (error_) {
 						span.recordException(error_ as Error);
 						message.respondError(500, (error_ as Error).message);
-						span.setStatus({code: SpanStatusCode.ERROR});
+						span.setStatus({ code: SpanStatusCode.ERROR });
 					} finally {
 						span.end();
 					}
@@ -228,18 +229,18 @@ export class Kmicro implements Callable {
 		if (options?.moleculerTrace) {
 			// we have to shorten the moleculer trace id because the jaeger exporter uses only 16 chars
 			const molTraceId = options.moleculerTrace.traceId
-				?.replaceAll('-', '')
+				?.replaceAll("-", "")
 				.slice(0, 16);
-			const traceId = Array.from({length: 16})
-				.fill('0')
-				.join('')
-				.concat(molTraceId ?? '');
+			const traceId = Array.from({ length: 16 })
+				.fill("0")
+				.join("")
+				.concat(molTraceId ?? "");
 			const molParentId = options.moleculerTrace.parentId
-				?.replaceAll('-', '')
+				?.replaceAll("-", "")
 				.slice(0, 16);
 			trace = {
 				traceId,
-				parentId: molParentId ?? '',
+				parentId: molParentId ?? "",
 			};
 		}
 
@@ -314,7 +315,7 @@ export class CallError extends Error {
 		private readonly payload: Uint8Array,
 	) {
 		super(message);
-		this.name = 'CallError';
+		this.name = "CallError";
 	}
 }
 
@@ -357,23 +358,23 @@ async function doCall(
 	},
 ): Promise<Uint8Array> {
 	if (meta.callDepth >= 20) {
-		throw new Error('max call depth reached: ' + meta.callDepth);
+		throw new Error(`max call depth reached: ${meta.callDepth}`);
 	}
 
-	const carrierData: Context | {traceparent?: string} = meta.context ?? {};
+	const carrierData: Context | { traceparent?: string } = meta.context ?? {};
 	if (options?.trace && !meta.context) {
-		const version = Buffer.alloc(1).toString('hex');
-		const flags = '01'; // means sampled
+		const version = Buffer.alloc(1).toString("hex");
+		const flags = "01"; // means sampled
 		const header = `${version}-${options.trace.traceId}-${options.trace.parentId}-${flags}`;
-		(carrierData as {traceparent?: string | undefined}).traceparent = header;
+		(carrierData as { traceparent?: string | undefined }).traceparent = header;
 	}
 
 	const callingContext: Context = propagation.extract(
 		context.active(),
 		carrierData,
 	);
-	const tracer = trace.getTracer('default');
-	const [service, action] = target.split('.');
+	const tracer = trace.getTracer("default");
+	const [service, action] = target.split(".");
 	return tracer.startActiveSpan(
 		`call: ${target}`,
 		{
@@ -387,13 +388,13 @@ async function doCall(
 		async (span) => {
 			// Add kmicro and otel headers to the nats message headers
 			const natsHeadersMap = headers();
-			natsHeadersMap.set('kmc-depth', (meta.callDepth + 1).toFixed(0));
+			natsHeadersMap.set("kmc-depth", (meta.callDepth + 1).toFixed(0));
 			propagation.inject(context.active(), natsHeadersMap, {
 				set(carrier, key, value) {
 					carrier.set(key, value);
 				},
 			});
-			const mergedHeaders = {...meta.header, ...options?.header};
+			const mergedHeaders = { ...meta.header, ...options?.header };
 			for (const key in mergedHeaders) {
 				if (!Object.hasOwn(mergedHeaders, key)) {
 					continue;
@@ -407,17 +408,17 @@ async function doCall(
 					headers: natsHeadersMap,
 					timeout: options?.timeout ?? 5000,
 				});
-				if (result.headers?.get('Nats-Service-Error-Code')) {
-					span.setStatus({code: SpanStatusCode.ERROR});
-					span.recordException(result.headers.get('Nats-Service-Error'));
+				if (result.headers?.get("Nats-Service-Error-Code")) {
+					span.setStatus({ code: SpanStatusCode.ERROR });
+					span.recordException(result.headers.get("Nats-Service-Error"));
 					throw new CallError(
-						'received error: ' + result.headers.get('Nats-Service-Error'),
+						`received error: ${result.headers.get("Nats-Service-Error")}`,
 						target,
 						payload,
 					);
 				}
 
-				span.setStatus({code: SpanStatusCode.OK});
+				span.setStatus({ code: SpanStatusCode.OK });
 				return result.data;
 			} finally {
 				span.end();
