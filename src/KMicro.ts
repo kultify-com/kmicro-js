@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { type NatsConnection, connect, headers } from "@nats-io/transport-node";
 import {
@@ -19,7 +20,6 @@ import {
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
-import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
