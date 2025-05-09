@@ -1,4 +1,3 @@
-import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { type NatsConnection, connect, headers } from "@nats-io/transport-node";
 import {
@@ -20,6 +19,7 @@ import {
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
+import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
@@ -75,7 +75,7 @@ export class Kmicro implements Callable {
 		return this.pinoLogger.child({ module });
 	}
 
-	public async init(natsURI: string) {
+	public async init(natsURI: string, enableOtel = true) {
 		const natsUrl = new URL(natsURI);
 		this.nc = await connect({
 			name: this.meta.name,
@@ -90,21 +90,23 @@ export class Kmicro implements Callable {
 			description: this.meta.description,
 		});
 		this.group = this.service.addGroup(this.meta.name);
-		this.otel = new NodeSDK({
-			serviceName: this.meta.name,
-			traceExporter: new OTLPTraceExporter(),
-			resource: new Resource({
-				[ATTR_SERVICE_NAME]: this.meta.name,
-				[ATTR_MESSAGING_SYSTEM]: "nats",
-			}),
-			instrumentations: [
-				new PinoInstrumentation({
-					disableLogSending: true,
+		if (enableOtel) {
+			this.otel = new NodeSDK({
+				serviceName: this.meta.name,
+				traceExporter: new OTLPTraceExporter(),
+				resource: new Resource({
+					[ATTR_SERVICE_NAME]: this.meta.name,
+					[ATTR_MESSAGING_SYSTEM]: "nats",
 				}),
-			],
-		});
+				instrumentations: [
+					new PinoInstrumentation({
+						disableLogSending: true,
+					}),
+				],
+			});
 
-		this.otel.start();
+			this.otel.start();
+		}
 	}
 
 	public async stop() {
