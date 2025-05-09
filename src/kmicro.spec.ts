@@ -13,6 +13,8 @@ describe("kmicro", () => {
 			process.env.NATS ?? "nats://localhost:4222",
 			serviceName,
 			"0.0.1",
+			undefined,
+			false,
 		);
 	});
 

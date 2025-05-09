@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { type NatsConnection, connect, headers } from "@nats-io/transport-node";
 import {
@@ -11,7 +12,7 @@ import {
 } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { PinoInstrumentation } from "@opentelemetry/instrumentation-pino";
-import { Resource } from "@opentelemetry/resources";
+import { resourceFromAttributes } from "@opentelemetry/resources";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
@@ -19,7 +20,6 @@ import {
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
-import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
@@ -30,13 +30,14 @@ export async function init(
 	serviceName: string,
 	version: string,
 	description?: string,
+	enableOtel = true,
 ) {
 	const kmicro = new Kmicro({
 		name: serviceName,
 		version,
 		description,
 	});
-	await kmicro.init(nats);
+	await kmicro.init(nats, enableOtel);
 	return kmicro;
 }
 
@@ -94,7 +95,7 @@ export class Kmicro implements Callable {
 			this.otel = new NodeSDK({
 				serviceName: this.meta.name,
 				traceExporter: new OTLPTraceExporter(),
-				resource: new Resource({
+				resource: resourceFromAttributes({
 					[ATTR_SERVICE_NAME]: this.meta.name,
 					[ATTR_MESSAGING_SYSTEM]: "nats",
 				}),
