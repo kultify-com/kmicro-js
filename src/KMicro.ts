@@ -1,4 +1,3 @@
-import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { type NatsConnection, connect, headers } from "@nats-io/transport-node";
 import {
@@ -20,6 +19,7 @@ import {
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
+import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
@@ -74,6 +74,11 @@ export class Kmicro implements Callable {
 
 	public getLogger(module?: string) {
 		return this.pinoLogger.child({ module });
+	}
+
+	public getNc(): NatsConnection {
+		assert(this.nc);
+		return this.nc;
 	}
 
 	public async init(natsURI: string, enableOtel = true) {
