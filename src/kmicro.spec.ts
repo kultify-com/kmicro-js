@@ -1,16 +1,35 @@
 import { randomUUID } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CallError, type Kmicro, init } from "./KMicro.js";
+import { NatsContainer, type StartedNatsContainer } from "@testcontainers/nats";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+} from "vitest";
+import { CallError, init, type Kmicro } from "./KMicro.js";
 
 describe("kmicro", () => {
 	let node: Kmicro;
+	let natsContainer: StartedNatsContainer;
 
 	let serviceName: string;
 
+	beforeAll(async () => {
+		natsContainer = await new NatsContainer("nats:2.11-alpine").start();
+	}, 30_000);
+
+	afterAll(() => {
+		return natsContainer.stop();
+	});
+
 	beforeEach(async () => {
 		serviceName = randomUUID();
+		const opts = natsContainer.getConnectionOptions();
 		node = await init(
-			process.env.NATS ?? "nats://localhost:4222",
+			`nats://${opts.user}:${opts.pass}@${opts.servers}`,
 			serviceName,
 			"0.0.1",
 			undefined,
