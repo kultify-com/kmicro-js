@@ -11,11 +11,6 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     container: node:20-bullseye
-    services:
-      # Label used to access the service container
-      nats:
-        # Docker Hub image
-        image: nats
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -28,8 +23,6 @@ jobs:
 
       - run: pnpm install
       - run: pnpm run ci
-        env:
-          NATS: nats://nats:4222
       - run: pnpm run build
 
       - run: npm publish --access public
