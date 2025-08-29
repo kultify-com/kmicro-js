@@ -1,4 +1,3 @@
-import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { connect, headers, type NatsConnection } from "@nats-io/transport-node";
 import {
@@ -20,6 +19,7 @@ import {
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
+import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
@@ -203,6 +203,13 @@ export class Kmicro implements Callable {
 						message.respond(result);
 						span.setStatus({ code: SpanStatusCode.OK });
 					} catch (error_) {
+						this.pinoLogger.error(
+							{
+								err: error_,
+								action: name,
+							},
+							`error in handler: ${(error_ as Error)?.message}`,
+						);
 						span.recordException(error_ as Error);
 						message.respondError(500, (error_ as Error).message);
 						span.setStatus({ code: SpanStatusCode.ERROR });
