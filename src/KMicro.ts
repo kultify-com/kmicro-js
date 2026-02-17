@@ -24,12 +24,16 @@ export async function init(
 	serviceName: string,
 	version: string,
 	description?: string,
+	logger?: Logger,
 ) {
-	const kmicro = new Kmicro({
-		name: serviceName,
-		version,
-		description,
-	});
+	const kmicro = new Kmicro(
+		{
+			name: serviceName,
+			version,
+			description,
+		},
+		logger,
+	);
 	await kmicro.init(nats);
 	return kmicro;
 }
@@ -52,7 +56,7 @@ export class Kmicro implements Callable {
 	private service: Service | undefined;
 	private group: ServiceGroup | undefined;
 	private nc: NatsConnection | undefined;
-	private readonly pinoLogger: pino.Logger;
+	private readonly logger: Logger;
 
 	constructor(
 		private readonly meta: {
@@ -60,12 +64,13 @@ export class Kmicro implements Callable {
 			version: string;
 			description: string | undefined;
 		},
+		logger?: Logger,
 	) {
-		this.pinoLogger = pino.pino();
+		this.logger = logger ?? pino.pino();
 	}
 
 	public getLogger(module?: string) {
-		return this.pinoLogger.child({ module });
+		return this.logger.child({ module });
 	}
 
 	public getNc(): NatsConnection {
@@ -146,7 +151,7 @@ export class Kmicro implements Callable {
 				},
 				contextWithOtel,
 				async (span) => {
-					const spanLogger = this.pinoLogger.child({
+					const spanLogger = this.logger.child({
 						action: name,
 						spanId: span.spanContext().spanId,
 						traceId: span.spanContext().traceId,
@@ -175,7 +180,7 @@ export class Kmicro implements Callable {
 						message.respond(result);
 						span.setStatus({ code: SpanStatusCode.OK });
 					} catch (error_) {
-						this.pinoLogger.error(
+						this.logger.error(
 							{
 								err: error_,
 								action: name,
