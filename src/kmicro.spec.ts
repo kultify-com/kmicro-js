@@ -32,8 +32,6 @@ describe("kmicro", () => {
 			`nats://${opts.user}:${opts.pass}@${opts.servers}`,
 			serviceName,
 			"0.0.1",
-			undefined,
-			false,
 		);
 	});
 

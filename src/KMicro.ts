@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { connect, headers, type NatsConnection } from "@nats-io/transport-node";
 import {
@@ -9,17 +10,10 @@ import {
 	SpanStatusCode,
 	trace,
 } from "@opentelemetry/api";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import { PinoInstrumentation } from "@opentelemetry/instrumentation-pino";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
-	ATTR_MESSAGING_SYSTEM,
 	ATTR_RPC_METHOD,
 	ATTR_RPC_SERVICE,
 } from "@opentelemetry/semantic-conventions/incubating";
-import assert from "node:assert";
 import pino, { type Logger } from "pino";
 
 /**
@@ -30,14 +24,13 @@ export async function init(
 	serviceName: string,
 	version: string,
 	description?: string,
-	enableOtel = true,
 ) {
 	const kmicro = new Kmicro({
 		name: serviceName,
 		version,
 		description,
 	});
-	await kmicro.init(nats, enableOtel);
+	await kmicro.init(nats);
 	return kmicro;
 }
 
@@ -59,7 +52,6 @@ export class Kmicro implements Callable {
 	private service: Service | undefined;
 	private group: ServiceGroup | undefined;
 	private nc: NatsConnection | undefined;
-	private otel: NodeSDK | undefined;
 	private readonly pinoLogger: pino.Logger;
 
 	constructor(
@@ -81,7 +73,7 @@ export class Kmicro implements Callable {
 		return this.nc;
 	}
 
-	public async init(natsURI: string, enableOtel = true) {
+	public async init(natsURI: string) {
 		const natsUrl = new URL(natsURI);
 		this.nc = await connect({
 			name: this.meta.name,
@@ -96,23 +88,6 @@ export class Kmicro implements Callable {
 			description: this.meta.description,
 		});
 		this.group = this.service.addGroup(this.meta.name);
-		if (enableOtel) {
-			this.otel = new NodeSDK({
-				serviceName: this.meta.name,
-				traceExporter: new OTLPTraceExporter(),
-				resource: resourceFromAttributes({
-					[ATTR_SERVICE_NAME]: this.meta.name,
-					[ATTR_MESSAGING_SYSTEM]: "nats",
-				}),
-				instrumentations: [
-					new PinoInstrumentation({
-						disableLogSending: true,
-					}),
-				],
-			});
-
-			this.otel.start();
-		}
 	}
 
 	public async stop() {
@@ -120,9 +95,6 @@ export class Kmicro implements Callable {
 			console.error(error);
 		});
 		await this.nc?.close().catch((error: unknown) => {
-			console.error(error);
-		});
-		await this.otel?.shutdown().catch((error: unknown) => {
 			console.error(error);
 		});
 	}

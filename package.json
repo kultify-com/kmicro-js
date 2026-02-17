@@ -1,6 +1,6 @@
 {
   "name": "@kultify/kmicro-js",
-  "version": "0.0.20",
+  "version": "0.1.0",
   "description": "",
   "repository": {
     "type": "git",
@@ -52,17 +52,17 @@
     "@nats-io/services": "3.1.0",
     "@nats-io/transport-node": "3.1.0",
     "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/semantic-conventions": "^1.36.0",
+    "pino": "^9.9.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.2",
     "@opentelemetry/core": "^2.0.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.203.0",
     "@opentelemetry/instrumentation-pino": "^0.50.0",
     "@opentelemetry/resources": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.203.0",
     "@opentelemetry/sdk-trace-node": "^2.0.1",
-    "@opentelemetry/semantic-conventions": "^1.36.0",
-    "pino": "^9.9.0"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.2.2",
     "@testcontainers/nats": "^11.5.1",
     "@tsconfig/node20": "^20.1.6",
     "@types/node": "^24.3.0",
