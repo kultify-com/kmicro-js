@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@nats-io/jetstream':
+        specifier: 3.3.1
+        version: 3.3.1
       '@nats-io/services':
         specifier: 3.1.0
         version: 3.1.0
@@ -320,8 +323,14 @@ packages:
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
 
+  '@nats-io/jetstream@3.3.1':
+    resolution: {integrity: sha512-oTIxM47pQfv4zCMlLN7FtARxSclMlUUPPn9I3VxRwMH+N2jkj1WCApu+tSL778KuljxfG8txi/MPwoWSXqbbQQ==}
+
   '@nats-io/nats-core@3.1.0':
     resolution: {integrity: sha512-xsSkLEGGcqNF+Ru8dMjPmKtfbBeq/U4meuJJX4Zi+5TBHpjpjNjs4YkCBC/pGYWnEum1/vdNPizjE1RdNHCyBg==}
+
+  '@nats-io/nats-core@3.3.1':
+    resolution: {integrity: sha512-myFXGTo4cCfKrsLDjkoEz7FjjjvSfBRjun7Qx3n3Z5OzW4JUY8Ou7VQsGAdXLQxHN3ae/XNXvmXxshDoFPex4w==}
 
   '@nats-io/nkeys@2.0.3':
     resolution: {integrity: sha512-JVt56GuE6Z89KUkI4TXUbSI9fmIfAmk6PMPknijmuL72GcD+UgIomTcRWiNvvJKxA01sBbmIPStqJs5cMRBC3A==}
@@ -2060,7 +2069,16 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
+  '@nats-io/jetstream@3.3.1':
+    dependencies:
+      '@nats-io/nats-core': 3.3.1
+
   '@nats-io/nats-core@3.1.0':
+    dependencies:
+      '@nats-io/nkeys': 2.0.3
+      '@nats-io/nuid': 2.0.3
+
+  '@nats-io/nats-core@3.3.1':
     dependencies:
       '@nats-io/nkeys': 2.0.3
       '@nats-io/nuid': 2.0.3

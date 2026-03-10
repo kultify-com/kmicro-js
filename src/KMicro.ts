@@ -1,4 +1,9 @@
 import assert from "node:assert";
+import {
+	type ConsumerMessages,
+	type JetStreamClient,
+	jetstream,
+} from "@nats-io/jetstream";
 import { type Service, type ServiceGroup, Svcm } from "@nats-io/services";
 import { connect, headers, type NatsConnection } from "@nats-io/transport-node";
 import {
@@ -52,11 +57,27 @@ interface Callable {
 	): Promise<Uint8Array>;
 }
 
+export type DomainEvent = {
+	id: string;
+	domain: string;
+	type: string;
+	orgId: string;
+	payload: Uint8Array;
+};
+
+export type EventHandler = (
+	context_: RequestContext,
+	event: DomainEvent,
+) => Promise<void>;
+
 export class Kmicro implements Callable {
 	private service: Service | undefined;
 	private group: ServiceGroup | undefined;
 	private nc: NatsConnection | undefined;
+	private js: JetStreamClient | undefined;
+	private readonly consumers: ConsumerMessages[] = [];
 	private readonly logger: Logger;
+	private eventSubjectPrefix = "events";
 
 	constructor(
 		private readonly meta: {
@@ -65,8 +86,14 @@ export class Kmicro implements Callable {
 			description: string | undefined;
 		},
 		logger?: Logger,
+		options?: {
+			eventSubjectPrefix?: string;
+		},
 	) {
 		this.logger = logger ?? pino.pino();
+		if (options?.eventSubjectPrefix) {
+			this.eventSubjectPrefix = options.eventSubjectPrefix;
+		}
 	}
 
 	public getLogger(module?: string) {
@@ -95,7 +122,151 @@ export class Kmicro implements Callable {
 		this.group = this.service.addGroup(this.meta.name);
 	}
 
+	private getJetStream(): JetStreamClient {
+		assert(this.nc);
+		if (!this.js) {
+			this.js = jetstream(this.nc);
+		}
+		return this.js;
+	}
+
+	public async publish(event: DomainEvent): Promise<void> {
+		assert(this.nc);
+		const js = this.getJetStream();
+		const subject = `${this.eventSubjectPrefix}.${event.orgId}.${event.domain}`;
+
+		const tracer = trace.getTracer(this.meta.name, this.meta.version);
+		await tracer.startActiveSpan(
+			`publish: ${subject}`,
+			{ kind: SpanKind.PRODUCER },
+			async (span) => {
+				try {
+					const body = JSON.stringify({
+						id: event.id,
+						domain: event.domain,
+						type: event.type,
+						orgId: event.orgId,
+						payload: Array.from(event.payload),
+					});
+
+					await js.publish(subject, Buffer.from(body), {
+						msgID: event.id,
+					});
+					span.setStatus({ code: SpanStatusCode.OK });
+				} catch (error_) {
+					span.recordException(error_ as Error);
+					span.setStatus({ code: SpanStatusCode.ERROR });
+					throw error_;
+				} finally {
+					span.end();
+				}
+			},
+		);
+	}
+
+	public async subscribe(
+		streamName: string,
+		consumerName: string,
+		handler: EventHandler,
+	): Promise<void> {
+		const js = this.getJetStream();
+		const consumer = await js.consumers.get(streamName, consumerName);
+		const messages = await consumer.consume();
+		this.consumers.push(messages);
+
+		(async () => {
+			for await (const msg of messages) {
+				const tracer = trace.getTracer(this.meta.name, this.meta.version);
+
+				const contextWithOtel: Context = propagation.extract(
+					context.active(),
+					msg.headers,
+					{
+						get(carrier, key) {
+							return carrier?.get(key);
+						},
+						keys(carrier) {
+							return carrier?.keys() ?? [];
+						},
+					},
+				);
+
+				await tracer.startActiveSpan(
+					`event: ${streamName}.${consumerName}`,
+					{ kind: SpanKind.CONSUMER },
+					contextWithOtel,
+					async (span) => {
+						try {
+							let event: DomainEvent;
+							try {
+								const parsed = JSON.parse(
+									Buffer.from(msg.data).toString(),
+								);
+								event = {
+									id: parsed.id,
+									domain: parsed.domain,
+									type: parsed.type,
+									orgId: parsed.orgId,
+									payload: new Uint8Array(parsed.payload),
+								};
+							} catch {
+								this.logger.error(
+									"failed to unmarshal domain event, terminating message",
+								);
+								msg.term();
+								span.setStatus({ code: SpanStatusCode.ERROR });
+								return;
+							}
+
+							const header: Record<string, string> = {};
+							for (const key of msg.headers?.keys() ?? []) {
+								if (msg.headers?.has(key)) {
+									header[key] = msg.headers?.get(key);
+								}
+							}
+
+							const spanLogger = this.logger.child({
+								event: `${event.domain}.${event.type}`,
+								spanId: span.spanContext().spanId,
+								traceId: span.spanContext().traceId,
+							});
+
+							const requestContext = new RequestContext(
+								contextWithOtel,
+								span,
+								this.getNc(),
+								spanLogger,
+								{
+									callDepth: 0,
+									currentService: this.meta.name,
+									header,
+								},
+							);
+
+							await handler(requestContext, event);
+							msg.ack();
+							span.setStatus({ code: SpanStatusCode.OK });
+						} catch (error_) {
+							this.logger.error(
+								{ err: error_ },
+								`error in event handler: ${(error_ as Error)?.message}`,
+							);
+							span.recordException(error_ as Error);
+							span.setStatus({ code: SpanStatusCode.ERROR });
+							msg.nak();
+						} finally {
+							span.end();
+						}
+					},
+				);
+			}
+		})();
+	}
+
 	public async stop() {
+		for (const consumer of this.consumers) {
+			consumer.close();
+		}
 		await this.service?.stop().catch((error: unknown) => {
 			console.error(error);
 		});
