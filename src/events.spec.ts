@@ -10,7 +10,7 @@ import {
 	expect,
 	it,
 } from "vitest";
-import { type DomainEvent, type Kmicro, init } from "./KMicro.js";
+import { type DomainEvent, init, type Kmicro } from "./KMicro.js";
 
 describe("domain events", () => {
 	let publisher: Kmicro;

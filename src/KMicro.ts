@@ -199,9 +199,7 @@ export class Kmicro implements Callable {
 						try {
 							let event: DomainEvent;
 							try {
-								const parsed = JSON.parse(
-									Buffer.from(msg.data).toString(),
-								);
+								const parsed = JSON.parse(Buffer.from(msg.data).toString());
 								event = {
 									id: parsed.id,
 									domain: parsed.domain,
