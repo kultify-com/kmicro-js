@@ -62,6 +62,7 @@ export type DomainEvent = {
 	domain: string;
 	type: string;
 	orgId: string;
+	entityId: string;
 	payload: Uint8Array;
 };
 
@@ -205,6 +206,7 @@ export class Kmicro implements Callable {
 									domain: parsed.domain,
 									type: parsed.type,
 									orgId: parsed.orgId,
+									entityId: parsed.entityId,
 									payload: new Uint8Array(parsed.payload),
 								};
 							} catch {

@@ -79,6 +79,7 @@ describe("domain events", () => {
 			domain: "order",
 			type: "completed",
 			orgId,
+			entityId: "123",
 			payload: Buffer.from(JSON.stringify({ orderId: "123" })),
 		};
 
@@ -117,6 +118,7 @@ describe("domain events", () => {
 			domain: "user",
 			type: "created",
 			orgId,
+			entityId: "user-456",
 			payload: new Uint8Array(),
 		};
 
@@ -151,6 +153,7 @@ describe("domain events", () => {
 			domain: "order",
 			type: "failed",
 			orgId,
+			entityId: "order-789",
 			payload: new Uint8Array(),
 		};
 
@@ -175,6 +178,7 @@ describe("domain events", () => {
 			domain: "order",
 			type: "completed",
 			orgId,
+			entityId: "order-999",
 			payload: new Uint8Array(),
 		};
 
