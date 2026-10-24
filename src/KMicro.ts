@@ -359,7 +359,8 @@ export class Kmicro implements Callable {
 							`error in handler: ${(error_ as Error)?.message}`,
 						);
 						span.recordException(error_ as Error);
-						message.respondError(500, (error_ as Error).message);
+						const code = error_ instanceof ServiceError ? error_.code : 500;
+						message.respondError(code, (error_ as Error).message);
 						span.setStatus({ code: SpanStatusCode.ERROR });
 					} finally {
 						span.end();
@@ -477,14 +478,44 @@ export class RequestContext {
 	}
 }
 
+/**
+ * ServiceError is a failure a handler answers with a code of its choosing,
+ * such as 400 for a request it refuses. Any other error a handler throws
+ * answers 500.
+ */
+export class ServiceError extends Error {
+	constructor(
+		readonly code: number,
+		message: string,
+	) {
+		super(message);
+		this.name = "ServiceError";
+	}
+}
+
+/**
+ * CallError is a remote endpoint that answered with an error. code is the
+ * endpoint's Nats-Service-Error-Code, such as "400" or "500", and
+ * description its Nats-Service-Error text.
+ */
 export class CallError extends Error {
 	constructor(
 		message: string,
 		private readonly target: string,
 		private readonly payload: Uint8Array,
+		readonly code: string = "",
+		readonly description: string = "",
 	) {
 		super(message);
 		this.name = "CallError";
+	}
+
+	/**
+	 * isClientError reports whether the endpoint refused the request with a
+	 * 4xx code: sending the same request again gets the same answer.
+	 */
+	isClientError(): boolean {
+		return /^4\d\d$/.test(this.code);
 	}
 }
 
@@ -578,13 +609,17 @@ async function doCall(
 					headers: natsHeadersMap,
 					timeout: options?.timeout ?? 5000,
 				});
-				if (result.headers?.get("Nats-Service-Error-Code")) {
+				const errorCode = result.headers?.get("Nats-Service-Error-Code");
+				if (errorCode) {
+					const description = result.headers?.get("Nats-Service-Error") ?? "";
 					span.setStatus({ code: SpanStatusCode.ERROR });
-					span.recordException(result.headers.get("Nats-Service-Error"));
+					span.recordException(description);
 					throw new CallError(
-						`received error: ${result.headers.get("Nats-Service-Error")}`,
+						`received error: ${description}`,
 						target,
 						payload,
+						errorCode,
+						description,
 					);
 				}
 
