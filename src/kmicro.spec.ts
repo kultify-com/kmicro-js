@@ -9,7 +9,7 @@ import {
 	expect,
 	it,
 } from "vitest";
-import { CallError, init, type Kmicro } from "./KMicro.js";
+import { CallError, init, type Kmicro, ServiceError } from "./KMicro.js";
 
 describe("kmicro", () => {
 	let node: Kmicro;
@@ -143,5 +143,35 @@ describe("kmicro", () => {
 			),
 		);
 		await expect(promise).rejects.toBeInstanceOf(CallError);
+	});
+
+	it("should carry the code and description a handler answers with", async () => {
+		node.addEndpoint("refuse", async () => {
+			throw new ServiceError(400, "name is required");
+		});
+
+		const error = await node
+			.call(`${serviceName}.refuse`, new Uint8Array())
+			.catch((error_: unknown) => error_);
+		expect(error).toBeInstanceOf(CallError);
+		expect((error as CallError).code).toBe("400");
+		expect((error as CallError).description).toBe("name is required");
+		expect((error as CallError).message).toBe(
+			"received error: name is required",
+		);
+		expect((error as CallError).isClientError()).toBe(true);
+	});
+
+	it("should answer 500 for any other handler error", async () => {
+		node.addEndpoint("crash", async () => {
+			throw new Error("boom");
+		});
+
+		const error = await node
+			.call(`${serviceName}.crash`, new Uint8Array())
+			.catch((error_: unknown) => error_);
+		expect(error).toBeInstanceOf(CallError);
+		expect((error as CallError).code).toBe("500");
+		expect((error as CallError).isClientError()).toBe(false);
 	});
 });
